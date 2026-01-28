@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construction ITB/Bid Management System</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .table-cell { border: 1px solid #e5e7eb; padding: 0.5rem; }
+        .editable-cell { cursor: text; }
+        .editable-cell:hover { background-color: #f9fafb; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Mock data structure
+        const INITIAL_PROJECTS = [
+            {
+                id: 1,
+                name: "Downtown Office Complex",
+                projectNumber: "PRJ-2026-001",
+                address: "123 Main St, Downtown",
+                bidDueDate: "2026-02-15",
+                status: "Active",
+                createdBy: "John Smith"
+            }
+        ];
+
+        const CSI_DIVISIONS = [
+            { code: "03", name: "Concrete" },
+            { code: "04", name: "Masonry" },
+            { code: "05", name: "Metals" },
+            { code: "06", name: "Wood, Plastics, and Composites" },
+            { code: "07", name: "Thermal and Moisture Protection" },
+            { code: "08", name: "Openings" },
+            { code: "09", name: "Finishes" },
+            { code: "21", name: "Fire Suppression" },
+            { code: "22", name: "Plumbing" },
+            { code: "23", name: "HVAC" },
+            { code: "26", name: "Electrical" },
+            { code: "31", name: "Earthwork" },
+            { code: "32", name: "Exterior Improvements" }
+        ];
+
+        const INITIAL_SUBS = [
+            { id: 1, name: "ABC Concrete Co.", email: "bids@abcconcrete.com", csiCode: "03", phone: "555-0101" },
+            { id: 2, name: "Premier Concrete", email: "estimating@premierconcrete.com", csiCode: "03", phone: "555-0102" },
+            { id: 3, name: "Elite Masonry", email: "bids@elitemasonry.com", csiCode: "04", phone: "555-0201" },
+            { id: 4, name: "Structural Steel Inc", email: "quotes@structuralsteel.com", csiCode: "05", phone: "555-0301" },
+            { id: 5, name: "Modern HVAC Systems", email: "bids@modernhvac.com", csiCode: "23", phone: "555-0401" },
+            { id: 6, name: "PowerTech Electric", email: "estimating@powertechelectric.com", csiCode: "26", phone: "555-0501" }
+        ];
+
+        // Main App Component
+        function App() {
+            const [currentUser, setCurrentUser] = useState({ name: "John Smith", role: "Senior Estimator", permissions: "full" });
+            const [currentView, setCurrentView] = useState("dashboard");
+            const [projects, setProjects] = useState(INITIAL_PROJECTS);
+            const [selectedProject, setSelectedProject] = useState(null);
+            const [subcontractors, setSubcontractors] = useState(INITIAL_SUBS);
+            const [bids, setBids] = useState([]);
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    {/* Header */}
+                    <header className="bg-white shadow-sm border-b border-gray-200">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h1 className="text-2xl font-bold text-gray-900">ITB/Bid Management System</h1>
+                                    <p className="text-sm text-gray-600 mt-1">{currentUser.name} - {currentUser.role}</p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setCurrentView("dashboard")}
+                                        className={`px-4 py-2 rounded-lg font-medium ${currentView === "dashboard" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                                    >
+                                        Dashboard
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentView("subcontractors")}
+                                        className={`px-4 py-2 rounded-lg font-medium ${currentView === "subcontractors" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                                    >
+                                        Subcontractors
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentView("subPortal")}
+                                        className="px-4 py-2 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700"
+                                    >
+                                        Sub Portal
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {currentView === "dashboard" && (
+                            <Dashboard 
+                                projects={projects} 
+                                setProjects={setProjects}
+                                selectedProject={selectedProject}
+                                setSelectedProject={setSelectedProject}
+                                setCurrentView={setCurrentView}
+                                subcontractors={subcontractors}
+                                bids={bids}
+                                setBids={setBids}
+                            />
+                        )}
+                        {currentView === "subcontractors" && (
+                            <SubcontractorManagement 
+                                subcontractors={subcontractors}
+                                setSubcontractors={setSubcontractors}
+                            />
+                        )}
+                        {currentView === "subPortal" && (
+                            <SubcontractorPortal 
+                                projects={projects}
+                                bids={bids}
+                                setBids={setBids}
+                            />
+                        )}
+                        {currentView === "createITB" && selectedProject && (
+                            <CreateITB 
+                                project={selectedProject}
+                                subcontractors={subcontractors}
+                                setCurrentView={setCurrentView}
+                                bids={bids}
+                                setBids={setBids}
+                            />
+                        )}
+                        {currentView === "compareBids" && selectedProject && (
+                            <BidComparison 
+                                project={selectedProject}
+                                bids={bids}
+                                subcontractors={subcontractors}
+                                setCurrentView={setCurrentView}
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        // Dashboard Component
+        function Dashboard({ projects, setProjects, selectedProject, setSelectedProject, setCurrentView, subcontractors, bids, setBids }) {
+            const [showNewProject, setShowNewProject] = useState(false);
+            const [newProject, setNewProject] = useState({
+                name: "",
+                projectNumber: "",
+                address: "",
+                bidDueDate: "",
+                status: "Active"
+            });
+
+            const handleCreateProject = () => {
+                const project = {
+                    ...newProject,
+                    id: projects.length + 1,
+                    createdBy: "John Smith"
+                };
+                setProjects([...projects, project]);
+                setShowNewProject(false);
+                setNewProject({ name: "", projectNumber: "", address: "", bidDueDate: "", status: "Active" });
+            };
+
+            const handleSelectProject = (project) => {
+                setSelectedProject(project);
+                setCurrentView("createITB");
+            };
+
+            const getProjectBidStats = (projectId) => {
+                const projectBids = bids.filter(b => b.projectId === projectId);
+                const pending = projectBids.filter(b => b.status === "Pending").length;
+                const received = projectBids.filter(b => b.status === "Submitted").length;
+                const declined = projectBids.filter(b => b.status === "Declined").length;
+                return { pending, received, declined, total: projectBids.length };
+            };
+
+            return (
+                <div>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900">Active Projects</h2>
+                        <button
+                            onClick={() => setShowNewProject(!showNewProject)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                        >
+                            + New Project
+                        </button>
+                    </div>
+
+                    {showNewProject && (
+                        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border border-gray-200">
+                            <h3 className="text-lg font-semibold mb-4">Create New Project</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+                                    <input
+                                        type="text"
+                                        value={newProject.name}
+                                        onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Downtown Office Complex"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Project Number</label>
+                                    <input
+                                        type="text"
+                                        value={newProject.projectNumber}
+                                        onChange={(e) => setNewProject({...newProject, projectNumber: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="PRJ-2026-001"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                                    <input
+                                        type="text"
+                                        value={newProject.address}
+                                        onChange={(e) => setNewProject({...newProject, address: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="123 Main St"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Bid Due Date</label>
+                                    <input
+                                        type="date"
+                                        value={newProject.bidDueDate}
+                                        onChange={(e) => setNewProject({...newProject, bidDueDate: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-3 mt-4">
+                                <button
+                                    onClick={handleCreateProject}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                >
+                                    Create Project
+                                </button>
+                                <button
+                                    onClick={() => setShowNewProject(false)}
+                                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid gap-4">
+                        {projects.map(project => {
+                            const stats = getProjectBidStats(project.id);
+                            return (
+                                <div key={project.id} className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-gray-900">{project.name}</h3>
+                                            <p className="text-sm text-gray-600 mt-1">{project.projectNumber} • {project.address}</p>
+                                        </div>
+                                        <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                                            {project.status}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-4 gap-4 mb-4">
+                                        <div className="bg-gray-50 p-3 rounded-lg">
+                                            <p className="text-sm text-gray-600">Bid Due Date</p>
+                                            <p className="text-lg font-semibold text-gray-900">{new Date(project.bidDueDate).toLocaleDateString()}</p>
+                                        </div>
+                                        <div className="bg-blue-50 p-3 rounded-lg">
+                                            <p className="text-sm text-gray-600">ITBs Sent</p>
+                                            <p className="text-lg font-semibold text-blue-900">{stats.total}</p>
+                                        </div>
+                                        <div className="bg-green-50 p-3 rounded-lg">
+                                            <p className="text-sm text-gray-600">Bids Received</p>
+                                            <p className="text-lg font-semibold text-green-900">{stats.received}</p>
+                                        </div>
+                                        <div className="bg-yellow-50 p-3 rounded-lg">
+                                            <p className="text-sm text-gray-600">Pending</p>
+                                            <p className="text-lg font-semibold text-yellow-900">{stats.pending}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => handleSelectProject(project)}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                        >
+                                            Manage ITBs
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedProject(project);
+                                                setCurrentView("compareBids");
+                                            }}
+                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                                        >
+                                            Compare Bids
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        // Subcontractor Management Component
+        function SubcontractorManagement({ subcontractors, setSubcontractors }) {
+            const [showAddSub, setShowAddSub] = useState(false);
+            const [newSub, setNewSub] = useState({ name: "", email: "", csiCode: "", phone: "" });
+            const [filterCSI, setFilterCSI] = useState("");
+
+            const handleAddSub = () => {
+                const sub = { ...newSub, id: subcontractors.length + 1 };
+                setSubcontractors([...subcontractors, sub]);
+                setShowAddSub(false);
+                setNewSub({ name: "", email: "", csiCode: "", phone: "" });
+            };
+
+            const filteredSubs = filterCSI 
+                ? subcontractors.filter(s => s.csiCode === filterCSI)
+                : subcontractors;
+
+            const groupedSubs = filteredSubs.reduce((acc, sub) => {
+                if (!acc[sub.csiCode]) acc[sub.csiCode] = [];
+                acc[sub.csiCode].push(sub);
+                return acc;
+            }, {});
+
+            return (
+                <div>
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-900">Subcontractor Database</h2>
+                            <p className="text-sm text-gray-600 mt-1">Organized by CSI Division Code</p>
+                        </div>
+                        <div className="flex gap-3">
+                            <select
+                                value={filterCSI}
+                                onChange={(e) => setFilterCSI(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">All CSI Codes</option>
+                                {CSI_DIVISIONS.map(div => (
+                                    <option key={div.code} value={div.code}>{div.code} - {div.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={() => setShowAddSub(!showAddSub)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                            >
+                                + Add Subcontractor
+                            </button>
+                        </div>
+                    </div>
+
+                    {showAddSub && (
+                        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border border-gray-200">
+                            <h3 className="text-lg font-semibold mb-4">Add New Subcontractor</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                                    <input
+                                        type="text"
+                                        value={newSub.name}
+                                        onChange={(e) => setNewSub({...newSub, name: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <input
+                                        type="email"
+                                        value={newSub.email}
+                                        onChange={(e) => setNewSub({...newSub, email: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">CSI Code</label>
+                                    <select
+                                        value={newSub.csiCode}
+                                        onChange={(e) => setNewSub({...newSub, csiCode: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">Select CSI Code</option>
+                                        {CSI_DIVISIONS.map(div => (
+                                            <option key={div.code} value={div.code}>{div.code} - {div.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                    <input
+                                        type="tel"
+                                        value={newSub.phone}
+                                        onChange={(e) => setNewSub({...newSub, phone: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-3 mt-4">
+                                <button
+                                    onClick={handleAddSub}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                >
+                                    Add Subcontractor
+                                </button>
+                                <button
+                                    onClick={() => setShowAddSub(false)}
+                                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="space-y-6">
+                        {Object.entries(groupedSubs).map(([csiCode, subs]) => {
+                            const division = CSI_DIVISIONS.find(d => d.code === csiCode);
+                            return (
+                                <div key={csiCode} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                                    <div className="bg-blue-50 px-6 py-3 border-b border-gray-200">
+                                        <h3 className="text-lg font-semibold text-gray-900">
+                                            CSI {csiCode} - {division?.name || "Unknown"}
+                                        </h3>
+                                    </div>
+                                    <div className="p-6">
+                                        <div className="grid gap-3">
+                                            {subs.map(sub => (
+                                                <div key={sub.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
+                                                    <div>
+                                                        <p className="font-semibold text-gray-900">{sub.name}</p>
+                                                        <p className="text-sm text-gray-600">{sub.email} • {sub.phone}</p>
+                                                    </div>
+                                                    <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                                                        View Details
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        // Create ITB Component
+        function CreateITB({ project, subcontractors, setCurrentView, bids, setBids }) {
+            const [selectedSubs, setSelectedSubs] = useState([]);
+            const [emailSubject, setEmailSubject] = useState(`ITB: ${project.name}`);
+            const [emailBody, setEmailBody] = useState(`Dear Subcontractor,\n\nYou are invited to bid on the following project:\n\nProject: ${project.name}\nProject Number: ${project.projectNumber}\nLocation: ${project.address}\nBid Due Date: ${new Date(project.bidDueDate).toLocaleDateString()}\n\nPlease submit your bid through our online portal.\n\nBest regards,\nEstimating Department`);
+
+            const projectBids = bids.filter(b => b.projectId === project.id);
+
+            const toggleSub = (subId) => {
+                if (selectedSubs.includes(subId)) {
+                    setSelectedSubs(selectedSubs.filter(id => id !== subId));
+                } else {
+                    setSelectedSubs([...selectedSubs, subId]);
+                }
+            };
+
+            const handleSendITB = () => {
+                const newBids = selectedSubs
+                    .filter(subId => !projectBids.find(b => b.subcontractorId === subId))
+                    .map(subId => ({
+                        id: bids.length + Math.random(),
+                        projectId: project.id,
+                        subcontractorId: subId,
+                        status: "Pending",
+                        sentDate: new Date().toISOString(),
+                        bidAmount: null,
+                        timeline: "",
+                        inclusions: "",
+                        exclusions: "",
+                        notes: "",
+                        estimatedResponseDate: ""
+                    }));
+                
+                setBids([...bids, ...newBids]);
+                alert(`ITB sent to ${newBids.length} subcontractor(s)!`);
+                setSelectedSubs([]);
+            };
+
+            const groupedSubs = subcontractors.reduce((acc, sub) => {
+                if (!acc[sub.csiCode]) acc[sub.csiCode] = [];
+                acc[sub.csiCode].push(sub);
+                return acc;
+            }, {});
+
+            return (
+                <div>
+                    <div className="mb-6">
+                        <button
+                            onClick={() => setCurrentView("dashboard")}
+                            className="text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                            ← Back to Dashboard
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">{project.name}</h2>
+                        <p className="text-sm text-gray-600">{project.projectNumber} • Bid Due: {new Date(project.bidDueDate).toLocaleDateString()}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                            <h3 className="text-lg font-semibold mb-4">Select Subcontractors</h3>
+                            <div className="space-y-4 max-h-96 overflow-y-auto">
+                                {Object.entries(groupedSubs).map(([csiCode, subs]) => {
+                                    const division = CSI_DIVISIONS.find(d => d.code === csiCode);
+                                    return (
+                                        <div key={csiCode}>
+                                            <p className="font-semibold text-gray-700 mb-2">CSI {csiCode} - {division?.name}</p>
+                                            {subs.map(sub => {
+                                                const alreadySent = projectBids.find(b => b.subcontractorId === sub.id);
+                                                return (
+                                                    <label key={sub.id} className="flex items-center p-2 hover:bg-gray-50 rounded">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedSubs.includes(sub.id)}
+                                                            onChange={() => toggleSub(sub.id)}
+                                                            disabled={alreadySent}
+                                                            className="mr-3"
+                                                        />
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium text-gray-900">{sub.name}</p>
+                                                            <p className="text-xs text-gray-600">{sub.email}</p>
+                                                        </div>
+                                                        {alreadySent && (
+                                                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Sent</span>
+                                                        )}
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                            <h3 className="text-lg font-semibold mb-4">Email Template</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                                    <input
+                                        type="text"
+                                        value={emailSubject}
+                                        onChange={(e) => setEmailSubject(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                                    <textarea
+                                        value={emailBody}
+                                        onChange={(e) => setEmailBody(e.target.value)}
+                                        rows="12"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleSendITB}
+                                    disabled={selectedSubs.length === 0}
+                                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                >
+                                    Send ITB to {selectedSubs.length} Subcontractor{selectedSubs.length !== 1 ? 's' : ''}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {projectBids.length > 0 && (
+                        <div className="mt-6 bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                            <h3 className="text-lg font-semibold mb-4">ITB Status Tracking</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="table-cell text-left text-sm font-semibold text-gray-700">Subcontractor</th>
+                                            <th className="table-cell text-left text-sm font-semibold text-gray-700">CSI Code</th>
+                                            <th className="table-cell text-left text-sm font-semibold text-gray-700">Status</th>
+                                            <th className="table-cell text-left text-sm font-semibold text-gray-700">Sent Date</th>
+                                            <th className="table-cell text-left text-sm font-semibold text-gray-700">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {projectBids.map(bid => {
+                                            const sub = subcontractors.find(s => s.id === bid.subcontractorId);
+                                            return (
+                                                <tr key={bid.id} className="hover:bg-gray-50">
+                                                    <td className="table-cell text-sm text-gray-900">{sub?.name}</td>
+                                                    <td className="table-cell text-sm text-gray-600">{sub?.csiCode}</td>
+                                                    <td className="table-cell text-sm">
+                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                            bid.status === "Submitted" ? "bg-green-100 text-green-800" :
+                                                            bid.status === "Declined" ? "bg-red-100 text-red-800" :
+                                                            "bg-yellow-100 text-yellow-800"
+                                                        }`}>
+                                                            {bid.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="table-cell text-sm text-gray-600">
+                                                        {new Date(bid.sentDate).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="table-cell text-sm">
+                                                        <button className="text-blue-600 hover:text-blue-700">View</button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Bid Comparison Component
+        function BidComparison({ project, bids, subcontractors, setCurrentView }) {
+            const projectBids = bids.filter(b => b.projectId === project.id && b.status === "Submitted");
+            
+            const groupedBids = projectBids.reduce((acc, bid) => {
+                const sub = subcontractors.find(s => s.id === bid.subcontractorId);
+                const csiCode = sub?.csiCode || "Unknown";
+                if (!acc[csiCode]) acc[csiCode] = [];
+                acc[csiCode].push({ ...bid, subcontractor: sub });
+                return acc;
+            }, {});
+
+            return (
+                <div>
+                    <div className="mb-6">
+                        <button
+                            onClick={() => setCurrentView("dashboard")}
+                            className="text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                            ← Back to Dashboard
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Bid Comparison - {project.name}</h2>
+                        <p className="text-sm text-gray-600">{projectBids.length} bid(s) received</p>
+                    </div>
+
+                    {Object.entries(groupedBids).map(([csiCode, csiBids]) => {
+                        const division = CSI_DIVISIONS.find(d => d.code === csiCode);
+                        return (
+                            <div key={csiCode} className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                                <div className="bg-blue-50 px-6 py-3 border-b border-gray-200">
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        CSI {csiCode} - {division?.name || "Unknown"}
+                                    </h3>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="table-cell text-left text-sm font-semibold text-gray-700">Subcontractor</th>
+                                                <th className="table-cell text-right text-sm font-semibold text-gray-700">Bid Amount</th>
+                                                <th className="table-cell text-left text-sm font-semibold text-gray-700">Timeline</th>
+                                                <th className="table-cell text-left text-sm font-semibold text-gray-700">Inclusions</th>
+                                                <th className="table-cell text-left text-sm font-semibold text-gray-700">Exclusions</th>
+                                                <th className="table-cell text-left text-sm font-semibold text-gray-700">Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {csiBids.sort((a, b) => (a.bidAmount || 0) - (b.bidAmount || 0)).map(bid => (
+                                                <tr key={bid.id} className="hover:bg-gray-50">
+                                                    <td className="table-cell text-sm font-medium text-gray-900">
+                                                        {bid.subcontractor?.name}
+                                                    </td>
+                                                    <td className="table-cell text-right text-sm font-semibold text-gray-900">
+                                                        ${bid.bidAmount?.toLocaleString() || "N/A"}
+                                                    </td>
+                                                    <td className="table-cell text-sm text-gray-700">{bid.timeline || "N/A"}</td>
+                                                    <td className="table-cell text-sm text-gray-700">{bid.inclusions || "N/A"}</td>
+                                                    <td className="table-cell text-sm text-gray-700">{bid.exclusions || "N/A"}</td>
+                                                    <td className="table-cell text-sm text-gray-600">{bid.notes || "-"}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {projectBids.length === 0 && (
+                        <div className="bg-gray-50 rounded-lg p-12 text-center">
+                            <p className="text-gray-600">No bids have been submitted yet.</p>
+                        </div>
+                    )}
+
+                    <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                            Export to Proposal
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Subcontractor Portal Component
+        function SubcontractorPortal({ projects, bids, setBids }) {
+            const [selectedSub, setSelectedSub] = useState(null);
+            const [selectedBid, setSelectedBid] = useState(null);
+            const [bidForm, setBidForm] = useState({
+                bidAmount: "",
+                timeline: "",
+                inclusions: "",
+                exclusions: "",
+                notes: "",
+                estimatedResponseDate: ""
+            });
+
+            const availableBids = selectedSub 
+                ? bids.filter(b => b.subcontractorId === selectedSub.id && b.status === "Pending")
+                : [];
+
+            const handleSelectBid = (bid) => {
+                setSelectedBid(bid);
+                setBidForm({
+                    bidAmount: bid.bidAmount || "",
+                    timeline: bid.timeline || "",
+                    inclusions: bid.inclusions || "",
+                    exclusions: bid.exclusions || "",
+                    notes: bid.notes || "",
+                    estimatedResponseDate: bid.estimatedResponseDate || ""
+                });
+            };
+
+            const handleSubmitBid = () => {
+                const updatedBids = bids.map(b => 
+                    b.id === selectedBid.id 
+                        ? { ...b, ...bidForm, bidAmount: parseFloat(bidForm.bidAmount), status: "Submitted", submittedDate: new Date().toISOString() }
+                        : b
+                );
+                setBids(updatedBids);
+                alert("Bid submitted successfully!");
+                setSelectedBid(null);
+                setBidForm({ bidAmount: "", timeline: "", inclusions: "", exclusions: "", notes: "", estimatedResponseDate: "" });
+            };
+
+            const handleDecline = () => {
+                const updatedBids = bids.map(b => 
+                    b.id === selectedBid.id 
+                        ? { ...b, status: "Declined" }
+                        : b
+                );
+                setBids(updatedBids);
+                alert("ITB declined.");
+                setSelectedBid(null);
+            };
+
+            return (
+                <div>
+                    <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-4">Subcontractor Bid Portal</h2>
+                        <p className="text-sm text-gray-600 mb-4">Select your company to view and submit bids</p>
+                        <select
+                            value={selectedSub?.id || ""}
+                            onChange={(e) => {
+                                const sub = INITIAL_SUBS.find(s => s.id === parseInt(e.target.value));
+                                setSelectedSub(sub);
+                                setSelectedBid(null);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">Select Your Company</option>
+                            {INITIAL_SUBS.map(sub => (
+                                <option key={sub.id} value={sub.id}>{sub.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {selectedSub && !selectedBid && (
+                        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                            <h3 className="text-lg font-semibold mb-4">Active ITBs for {selectedSub.name}</h3>
+                            {availableBids.length === 0 ? (
+                                <p className="text-gray-600">No active ITBs at this time.</p>
+                            ) : (
+                                <div className="grid gap-4">
+                                    {availableBids.map(bid => {
+                                        const project = projects.find(p => p.id === bid.projectId);
+                                        return (
+                                            <div key={bid.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <h4 className="font-semibold text-gray-900">{project?.name}</h4>
+                                                        <p className="text-sm text-gray-600">{project?.projectNumber} • {project?.address}</p>
+                                                    </div>
+                                                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
+                                                        Pending
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-gray-700 mb-3">
+                                                    Bid Due: {new Date(project?.bidDueDate).toLocaleDateString()}
+                                                </p>
+                                                <button
+                                                    onClick={() => handleSelectBid(bid)}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                                >
+                                                    Submit Bid
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {selectedBid && (
+                        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                            <button
+                                onClick={() => setSelectedBid(null)}
+                                className="text-blue-600 hover:text-blue-700 font-medium mb-4"
+                            >
+                                ← Back to ITB List
+                            </button>
+                            
+                            <h3 className="text-lg font-semibold mb-4">
+                                Submit Bid - {projects.find(p => p.id === selectedBid.projectId)?.name}
+                            </h3>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Bid Amount ($) *</label>
+                                    <input
+                                        type="number"
+                                        value={bidForm.bidAmount}
+                                        onChange={(e) => setBidForm({...bidForm, bidAmount: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        placeholder="150000"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Timeline to Complete</label>
+                                    <input
+                                        type="text"
+                                        value={bidForm.timeline}
+                                        onChange={(e) => setBidForm({...bidForm, timeline: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        placeholder="6 weeks"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Inclusions</label>
+                                    <textarea
+                                        value={bidForm.inclusions}
+                                        onChange={(e) => setBidForm({...bidForm, inclusions: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        rows="3"
+                                        placeholder="Materials, labor, equipment..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Exclusions</label>
+                                    <textarea
+                                        value={bidForm.exclusions}
+                                        onChange={(e) => setBidForm({...bidForm, exclusions: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        rows="3"
+                                        placeholder="Items not included in bid..."
+                                    />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                                    <textarea
+                                        value={bidForm.notes}
+                                        onChange={(e) => setBidForm({...bidForm, notes: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        rows="3"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleSubmitBid}
+                                    disabled={!bidForm.bidAmount}
+                                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-300"
+                                >
+                                    Submit Bid
+                                </button>
+                                <button
+                                    onClick={handleDecline}
+                                    className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+                                >
+                                    Decline ITB
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Render the app
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
