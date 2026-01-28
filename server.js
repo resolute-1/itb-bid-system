@@ -415,6 +415,182 @@ app.post('/api/bids', async (req, res) => {
 });
 
 // ==========================================
+// DATABASE SETUP ENDPOINT (ONE-TIME USE)
+// ==========================================
+
+app.get('/setup', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    res.write('🔄 Starting database setup...\n\n');
+
+    // Drop existing tables
+    await client.query(`
+      DROP TABLE IF EXISTS documents CASCADE;
+      DROP TABLE IF EXISTS bids CASCADE;
+      DROP TABLE IF EXISTS itbs CASCADE;
+      DROP TABLE IF EXISTS projects CASCADE;
+      DROP TABLE IF EXISTS companies CASCADE;
+      DROP TABLE IF EXISTS users CASCADE;
+    `);
+    res.write('✅ Dropped old tables\n');
+
+    // Create users table
+    await client.query(`
+      CREATE TABLE users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL CHECK (role IN ('senior_estimator', 'junior_estimator', 'admin', 'subcontractor')),
+        company_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        last_login TIMESTAMP
+      );
+    `);
+    res.write('✅ Created users table\n');
+
+    // Create companies table
+    await client.query(`
+      CREATE TABLE companies (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        csi_code VARCHAR(10),
+        address TEXT,
+        contact_person VARCHAR(255),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    res.write('✅ Created companies table\n');
+
+    // Create projects table
+    await client.query(`
+      CREATE TABLE projects (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        project_number VARCHAR(100) UNIQUE NOT NULL,
+        address TEXT,
+        bid_due_date DATE,
+        status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'awarded', 'cancelled')),
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    res.write('✅ Created projects table\n');
+
+    // Create ITBs table
+    await client.query(`
+      CREATE TABLE itbs (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        subcontractor_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+        status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'submitted', 'declined', 'expired')),
+        sent_date TIMESTAMP,
+        opened_date TIMESTAMP,
+        email_subject TEXT,
+        email_body TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    res.write('✅ Created itbs table\n');
+
+    // Create bids table
+    await client.query(`
+      CREATE TABLE bids (
+        id SERIAL PRIMARY KEY,
+        itb_id INTEGER REFERENCES itbs(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        subcontractor_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+        bid_amount DECIMAL(12, 2),
+        timeline VARCHAR(255),
+        inclusions TEXT,
+        exclusions TEXT,
+        notes TEXT,
+        estimated_response_date DATE,
+        submitted_date TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    res.write('✅ Created bids table\n');
+
+    // Create documents table
+    await client.query(`
+      CREATE TABLE documents (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        filename VARCHAR(255) NOT NULL,
+        file_path TEXT NOT NULL,
+        file_type VARCHAR(50),
+        uploaded_by INTEGER REFERENCES users(id),
+        uploaded_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    res.write('✅ Created documents table\n');
+
+    // Create indexes
+    await client.query(`
+      CREATE INDEX idx_projects_status ON projects(status);
+      CREATE INDEX idx_projects_created_by ON projects(created_by);
+      CREATE INDEX idx_itbs_project ON itbs(project_id);
+      CREATE INDEX idx_itbs_subcontractor ON itbs(subcontractor_id);
+      CREATE INDEX idx_itbs_status ON itbs(status);
+      CREATE INDEX idx_bids_project ON bids(project_id);
+      CREATE INDEX idx_bids_subcontractor ON bids(subcontractor_id);
+      CREATE INDEX idx_companies_csi ON companies(csi_code);
+    `);
+    res.write('✅ Created indexes\n');
+
+    // Insert demo data
+    const hashedPassword = await bcrypt.hash('password123', 10);
+
+    await client.query(`
+      INSERT INTO users (email, password_hash, name, role) VALUES
+      ('john@construction.com', $1, 'John Smith', 'senior_estimator'),
+      ('mary@construction.com', $1, 'Mary Johnson', 'junior_estimator'),
+      ('admin@construction.com', $1, 'Admin User', 'admin');
+    `, [hashedPassword]);
+    res.write('✅ Created demo users\n');
+
+    await client.query(`
+      INSERT INTO companies (name, email, phone, csi_code, contact_person) VALUES
+      ('ABC Concrete Co.', 'bids@abcconcrete.com', '555-0101', '03', 'Mike Thompson'),
+      ('Premier Concrete', 'estimating@premierconcrete.com', '555-0102', '03', 'Sarah Davis'),
+      ('Elite Masonry', 'bids@elitemasonry.com', '555-0201', '04', 'Robert Brown'),
+      ('Structural Steel Inc', 'quotes@structuralsteel.com', '555-0301', '05', 'Jennifer Wilson'),
+      ('Modern HVAC Systems', 'bids@modernhvac.com', '555-0401', '23', 'David Martinez'),
+      ('PowerTech Electric', 'estimating@powertechelectric.com', '555-0501', '26', 'Lisa Anderson');
+    `);
+    res.write('✅ Created demo subcontractors\n');
+
+    await client.query(`
+      INSERT INTO projects (name, project_number, address, bid_due_date, created_by, status) VALUES
+      ('Downtown Office Complex', 'PRJ-2026-001', '123 Main St, Downtown', '2026-02-15', 1, 'active');
+    `);
+    res.write('✅ Created demo project\n');
+
+    res.write('\n🎉 Database setup completed successfully!\n\n');
+    res.write('📝 Login credentials:\n');
+    res.write('   Email: john@construction.com\n');
+    res.write('   Password: password123\n\n');
+    res.write('✅ You can now close this page and visit your app!\n');
+    res.end();
+
+  } catch (error) {
+    res.write(`\n❌ Error: ${error.message}\n`);
+    res.end();
+    console.error('Setup error:', error);
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
 // HEALTH CHECK
 // ==========================================
 
