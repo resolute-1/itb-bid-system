@@ -73,7 +73,7 @@ Railway will create your project (it might fail to deploy initially - that's OK,
 3. **Clone Your Repository:**
    Open Terminal/Command Prompt and run:
    ```bash
-   git clone https://github.com/YOUR-USERNAME/itb-bid-system.git
+   git clone https://github.com/resolute-1/itb-bid-system.git
    cd itb-bid-system
    ```
 

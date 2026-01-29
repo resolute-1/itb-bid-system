@@ -9,7 +9,7 @@
 Open Terminal and check:
 
 ```bash
-cd ~/Desktop/itb-bid-system
+cd ~/edward/itb-bid-system
 ls -la
 ```
 
@@ -39,7 +39,7 @@ Copy these files to your project folder:
 Option A - Download from this chat and copy to folder
 Option B - Create them manually in your project folder
 
-Make sure they're in the root directory: `~/Desktop/itb-bid-system/`
+Make sure they're in the root directory: `~/edwarmoth/itb-bid-system/`
 
 ---
 
@@ -47,7 +47,7 @@ Make sure they're in the root directory: `~/Desktop/itb-bid-system/`
 
 1. Open Cursor IDE
 2. File → Open Folder
-3. Select: `~/Desktop/itb-bid-system`
+3. Select: `~/edwarmoth/itb-bid-system`
 4. Cursor loads your entire project
 
 ---

@@ -1,4 +1,4 @@
-# DEPLOYMENT CHECKLIST - START HERE!
+edwarmoth# DEPLOYMENT CHECKLIST - START HERE!
 
 **Follow these steps in order. Check off each one as you complete it.**
 
@@ -41,8 +41,8 @@
 ### Step 5: Clone Repository to Your Computer
 Open Terminal/Command Prompt and run:
 ```bash
-cd Desktop  # or wherever you want to work
-git clone https://github.com/YOUR-USERNAME/itb-bid-system.git
+cd edwarmoth  # or wherever you want to work
+git clone https://github.com/resolute-1/itb-bid-system.git
 cd itb-bid-system
 ```
 

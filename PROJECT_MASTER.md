@@ -334,7 +334,7 @@ FRONTEND_URL=<production domain>
 - Public URL: [Generate Domain to get this]
 
 **FILES LOCATIONS:**
-- Local: ~/Desktop/itb-bid-system
+- Local: ~/edwarmoth/itb-bid-system
 - GitHub: https://github.com/resolute-1/itb-bid-system (all files synced)
 - Railway: Connected and auto-deploying from GitHub main branch
 
