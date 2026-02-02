@@ -4,6 +4,67 @@
 
 ---
 
+## PROJECT VISION: PACKAGED SOFTWARE PRODUCT
+
+**This is NOT just internal software - this is being built as a PRODUCT for sale/distribution.**
+
+### Business Model:
+- **Standalone installable software** that construction companies can deploy on their own servers
+- **Multi-tenant capable** - one installation can serve multiple companies (optional)
+- **Self-hosted** - customers own their data and infrastructure
+- **Alternative to Procore/RedTeam** - but affordable and customizable
+
+### Target Customers:
+- Small to medium construction companies (1-50 employees)
+- General contractors and subcontractors
+- Companies wanting to own their data
+- Companies wanting to avoid $400/user/month SaaS fees
+
+### Deployment Options:
+1. **Self-hosted** - Customer installs on their own server (primary)
+2. **Hosted service** - We host for customer (optional future)
+3. **Hybrid** - Some modules self-hosted, some cloud (future)
+
+---
+
+## PRODUCT ARCHITECTURE REQUIREMENTS
+
+### Installation Requirements:
+Must be easy for non-technical users to install:
+- **Installer script** - Automated setup process
+- **Dependency checking** - Verify Node.js, PostgreSQL available
+- **Database initialization** - Automatic schema creation
+- **Default configuration** - Sensible defaults, easy customization
+- **Setup wizard** - Web-based initial configuration
+
+### Multi-Tenant Considerations:
+Even though primarily self-hosted, architecture should support:
+- **Company isolation** - Data segregation between companies
+- **Configurable branding** - Logo, colors, company name
+- **Feature flags** - Enable/disable features per installation
+- **Role-based permissions** - Flexible user access control
+
+### Configuration Management:
+- **Environment variables** - For sensitive settings
+- **Config file** - For application settings (config.json)
+- **Database-driven config** - For runtime settings
+- **Admin panel** - Web interface for configuration
+
+### Security Requirements:
+- **Secure by default** - HTTPS, strong passwords enforced
+- **Data encryption** - Sensitive data encrypted at rest
+- **Audit logging** - Track all critical actions
+- **Backup/restore** - Built-in backup functionality
+- **Update mechanism** - Secure update process
+
+### Licensing & Updates:
+- **License key system** - Validate installations (future)
+- **Version checking** - Notify when updates available
+- **Update channel** - Automatic or manual updates
+- **Migration scripts** - Database schema updates
+
+---
+
 ## WHAT THIS APP DOES
 
 Construction project management software for managing the Invitation to Bid (ITB) process and comparing subcontractor bids.
