@@ -22,18 +22,70 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Mock data structure
-        const INITIAL_PROJECTS = [
-            {
-                id: 1,
-                name: "Downtown Office Complex",
-                projectNumber: "PRJ-2026-001",
-                address: "123 Main St, Downtown",
-                bidDueDate: "2026-02-15",
-                status: "Active",
-                createdBy: "John Smith"
+        // API Configuration
+        const API_BASE_URL = window.location.origin;
+        
+        // API Helper Functions
+        const api = {
+            getToken: () => localStorage.getItem('token'),
+            setToken: (token) => localStorage.setItem('token', token),
+            clearToken: () => localStorage.removeItem('token'),
+            
+            headers: () => ({
+                'Content-Type': 'application/json',
+                ...(api.getToken() ? { 'Authorization': `Bearer ${api.getToken()}` } : {})
+            }),
+
+            async login(email, password) {
+                const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (data.token) {
+                    api.setToken(data.token);
+                }
+                return data;
+            },
+
+            async getProjects() {
+                const res = await fetch(`${API_BASE_URL}/api/projects`, {
+                    headers: api.headers()
+                });
+                return await res.json();
+            },
+
+            async getSubcontractors() {
+                const res = await fetch(`${API_BASE_URL}/api/subcontractors`, {
+                    headers: api.headers()
+                });
+                return await res.json();
+            },
+
+            async createSubcontractor(data) {
+                const res = await fetch(`${API_BASE_URL}/api/subcontractors`, {
+                    method: 'POST',
+                    headers: api.headers(),
+                    body: JSON.stringify(data)
+                });
+                return await res.json();
+            },
+
+            async sendITBs(projectId, subcontractorIds, emailSubject, emailBody) {
+                const res = await fetch(`${API_BASE_URL}/api/itbs`, {
+                    method: 'POST',
+                    headers: api.headers(),
+                    body: JSON.stringify({
+                        project_id: projectId,
+                        subcontractor_ids: subcontractorIds,
+                        email_subject: emailSubject,
+                        email_body: emailBody
+                    })
+                });
+                return await res.json();
             }
-        ];
+        };
 
         const CSI_DIVISIONS = [
             { code: "03", name: "Concrete" },
@@ -51,23 +103,146 @@
             { code: "32", name: "Exterior Improvements" }
         ];
 
-        const INITIAL_SUBS = [
-            { id: 1, name: "ABC Concrete Co.", email: "bids@abcconcrete.com", csiCode: "03", phone: "555-0101" },
-            { id: 2, name: "Premier Concrete", email: "estimating@premierconcrete.com", csiCode: "03", phone: "555-0102" },
-            { id: 3, name: "Elite Masonry", email: "bids@elitemasonry.com", csiCode: "04", phone: "555-0201" },
-            { id: 4, name: "Structural Steel Inc", email: "quotes@structuralsteel.com", csiCode: "05", phone: "555-0301" },
-            { id: 5, name: "Modern HVAC Systems", email: "bids@modernhvac.com", csiCode: "23", phone: "555-0401" },
-            { id: 6, name: "PowerTech Electric", email: "estimating@powertechelectric.com", csiCode: "26", phone: "555-0501" }
-        ];
+        // Login Component
+        function Login({ onLogin }) {
+            const [email, setEmail] = useState('john@construction.com');
+            const [password, setPassword] = useState('password123');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setError('');
+                setLoading(true);
+
+                try {
+                    const data = await api.login(email, password);
+                    if (data.token) {
+                        onLogin(data.user);
+                    } else {
+                        setError(data.error || 'Login failed');
+                    }
+                } catch (err) {
+                    setError('Connection error. Please try again.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-6">ITB/Bid Management System</h1>
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    required
+                                />
+                            </div>
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                                    {error}
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
+                            >
+                                {loading ? 'Logging in...' : 'Login'}
+                            </button>
+                            <p className="text-sm text-gray-600 mt-4">
+                                Demo: john@construction.com / password123
+                            </p>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
 
         // Main App Component
         function App() {
-            const [currentUser, setCurrentUser] = useState({ name: "John Smith", role: "Senior Estimator", permissions: "full" });
+            const [currentUser, setCurrentUser] = useState(null);
             const [currentView, setCurrentView] = useState("dashboard");
-            const [projects, setProjects] = useState(INITIAL_PROJECTS);
+            const [projects, setProjects] = useState([]);
             const [selectedProject, setSelectedProject] = useState(null);
-            const [subcontractors, setSubcontractors] = useState(INITIAL_SUBS);
+            const [subcontractors, setSubcontractors] = useState([]);
             const [bids, setBids] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            // Load data from API on mount
+            useEffect(() => {
+                const loadData = async () => {
+                    if (!api.getToken()) {
+                        setLoading(false);
+                        return;
+                    }
+                    
+                    try {
+                        const [projectsData, subsData] = await Promise.all([
+                            api.getProjects(),
+                            api.getSubcontractors()
+                        ]);
+                        
+                        setProjects(projectsData.map(p => ({
+                            ...p,
+                            projectNumber: p.project_number,
+                            bidDueDate: p.bid_due_date,
+                            createdBy: p.created_by_name
+                        })));
+                        
+                        setSubcontractors(subsData.map(s => ({
+                            ...s,
+                            csiCode: s.csi_code,
+                            contactPerson: s.contact_person
+                        })));
+                    } catch (err) {
+                        console.error('Failed to load data:', err);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                loadData();
+            }, [currentUser]);
+
+            const handleLogin = (user) => {
+                setCurrentUser(user);
+            };
+
+            const handleLogout = () => {
+                api.clearToken();
+                setCurrentUser(null);
+                setProjects([]);
+                setSubcontractors([]);
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                        <div className="text-gray-600">Loading...</div>
+                    </div>
+                );
+            }
+
+            if (!currentUser) {
+                return <Login onLogin={handleLogin} />;
+            }
 
             return (
                 <div className="min-h-screen bg-gray-50">
@@ -97,6 +272,12 @@
                                         className="px-4 py-2 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700"
                                     >
                                         Sub Portal
+                                    </button>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    >
+                                        Logout
                                     </button>
                                 </div>
                             </div>
@@ -322,14 +503,42 @@
         // Subcontractor Management Component
         function SubcontractorManagement({ subcontractors, setSubcontractors }) {
             const [showAddSub, setShowAddSub] = useState(false);
-            const [newSub, setNewSub] = useState({ name: "", email: "", csiCode: "", phone: "" });
+            const [newSub, setNewSub] = useState({ name: "", email: "", csiCode: "", phone: "", contactPerson: "", address: "", notes: "" });
             const [filterCSI, setFilterCSI] = useState("");
+            const [saving, setSaving] = useState(false);
+            const [error, setError] = useState('');
 
-            const handleAddSub = () => {
-                const sub = { ...newSub, id: subcontractors.length + 1 };
-                setSubcontractors([...subcontractors, sub]);
-                setShowAddSub(false);
-                setNewSub({ name: "", email: "", csiCode: "", phone: "" });
+            const handleAddSub = async () => {
+                setSaving(true);
+                setError('');
+                
+                try {
+                    const data = await api.createSubcontractor({
+                        name: newSub.name,
+                        email: newSub.email,
+                        phone: newSub.phone,
+                        csi_code: newSub.csiCode,
+                        address: newSub.address,
+                        contact_person: newSub.contactPerson,
+                        notes: newSub.notes
+                    });
+                    
+                    // Add to local state
+                    setSubcontractors([...subcontractors, {
+                        ...data,
+                        csiCode: data.csi_code,
+                        contactPerson: data.contact_person
+                    }]);
+                    
+                    setShowAddSub(false);
+                    setNewSub({ name: "", email: "", csiCode: "", phone: "", contactPerson: "", address: "", notes: "" });
+                    alert('Subcontractor added successfully!');
+                } catch (err) {
+                    setError('Failed to add subcontractor. Please try again.');
+                    console.error(err);
+                } finally {
+                    setSaving(false);
+                }
             };
 
             const filteredSubs = filterCSI 
@@ -372,31 +581,39 @@
                     {showAddSub && (
                         <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border border-gray-200">
                             <h3 className="text-lg font-semibold mb-4">Add New Subcontractor</h3>
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+                                    {error}
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
                                     <input
                                         type="text"
                                         value={newSub.name}
                                         onChange={(e) => setNewSub({...newSub, name: e.target.value})}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                                     <input
                                         type="email"
                                         value={newSub.email}
                                         onChange={(e) => setNewSub({...newSub, email: e.target.value})}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">CSI Code</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">CSI Code *</label>
                                     <select
                                         value={newSub.csiCode}
                                         onChange={(e) => setNewSub({...newSub, csiCode: e.target.value})}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        required
                                     >
                                         <option value="">Select CSI Code</option>
                                         {CSI_DIVISIONS.map(div => (
@@ -417,9 +634,10 @@
                             <div className="flex gap-3 mt-4">
                                 <button
                                     onClick={handleAddSub}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                    disabled={saving || !newSub.name || !newSub.email || !newSub.csiCode}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Add Subcontractor
+                                    {saving ? 'Saving...' : 'Add Subcontractor'}
                                 </button>
                                 <button
                                     onClick={() => setShowAddSub(false)}
@@ -467,8 +685,10 @@
         // Create ITB Component
         function CreateITB({ project, subcontractors, setCurrentView, bids, setBids }) {
             const [selectedSubs, setSelectedSubs] = useState([]);
-            const [emailSubject, setEmailSubject] = useState(`ITB: ${project.name}`);
+            const [emailSubject, setEmailSubject] = useState(`Invitation to Bid - ${project.name}`);
             const [emailBody, setEmailBody] = useState(`Dear Subcontractor,\n\nYou are invited to bid on the following project:\n\nProject: ${project.name}\nProject Number: ${project.projectNumber}\nLocation: ${project.address}\nBid Due Date: ${new Date(project.bidDueDate).toLocaleDateString()}\n\nPlease submit your bid through our online portal.\n\nBest regards,\nEstimating Department`);
+            const [sending, setSending] = useState(false);
+            const [error, setError] = useState('');
 
             const projectBids = bids.filter(b => b.projectId === project.id);
 
@@ -480,26 +700,56 @@
                 }
             };
 
-            const handleSendITB = () => {
-                const newBids = selectedSubs
-                    .filter(subId => !projectBids.find(b => b.subcontractorId === subId))
-                    .map(subId => ({
-                        id: bids.length + Math.random(),
-                        projectId: project.id,
-                        subcontractorId: subId,
-                        status: "Pending",
-                        sentDate: new Date().toISOString(),
-                        bidAmount: null,
-                        timeline: "",
-                        inclusions: "",
-                        exclusions: "",
-                        notes: "",
-                        estimatedResponseDate: ""
-                    }));
-                
-                setBids([...bids, ...newBids]);
-                alert(`ITB sent to ${newBids.length} subcontractor(s)!`);
-                setSelectedSubs([]);
+            const handleSendITB = async () => {
+                if (selectedSubs.length === 0) {
+                    alert('Please select at least one subcontractor');
+                    return;
+                }
+
+                setSending(true);
+                setError('');
+
+                try {
+                    const result = await api.sendITBs(
+                        project.id,
+                        selectedSubs,
+                        emailSubject,
+                        emailBody
+                    );
+
+                    if (result.itbs) {
+                        // Show detailed results
+                        const emailResults = result.emailResults || [];
+                        const successCount = emailResults.filter(r => r.success).length;
+                        const failCount = emailResults.filter(r => !r.success).length;
+                        
+                        let message = `✅ Successfully sent ${successCount} ITB email(s)!\n\n`;
+                        
+                        if (failCount > 0) {
+                            message += `⚠️ ${failCount} email(s) failed to send.\n\n`;
+                        }
+                        
+                        message += 'Details:\n';
+                        emailResults.forEach(r => {
+                            if (r.success) {
+                                message += `✅ ${r.subcontractor} (${r.email})\n`;
+                            } else {
+                                message += `❌ ${r.subcontractor} (${r.email}) - ${r.message || r.error}\n`;
+                            }
+                        });
+                        
+                        alert(message);
+                        setSelectedSubs([]);
+                        setCurrentView('dashboard');
+                    } else {
+                        throw new Error(result.error || 'Failed to send ITBs');
+                    }
+                } catch (err) {
+                    setError('Failed to send ITBs: ' + (err.message || 'Please try again.'));
+                    console.error('Send ITB error:', err);
+                } finally {
+                    setSending(false);
+                }
             };
 
             const groupedSubs = subcontractors.reduce((acc, sub) => {
@@ -581,12 +831,17 @@
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
+                                {error && (
+                                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                                        {error}
+                                    </div>
+                                )}
                                 <button
                                     onClick={handleSendITB}
-                                    disabled={selectedSubs.length === 0}
+                                    disabled={selectedSubs.length === 0 || sending}
                                     className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
                                 >
-                                    Send ITB to {selectedSubs.length} Subcontractor{selectedSubs.length !== 1 ? 's' : ''}
+                                    {sending ? '📧 Sending Emails...' : `Send ITB to ${selectedSubs.length} Subcontractor${selectedSubs.length !== 1 ? 's' : ''}`}
                                 </button>
                             </div>
                         </div>
