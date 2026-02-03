@@ -6,6 +6,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const { sendITB, sendBidReceived } = require('./utils/email');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -329,9 +330,36 @@ app.post('/api/itbs', authenticateToken, requireRole(['senior_estimator', 'admin
     try {
       await client.query('BEGIN');
 
+      // Get project details for email
+      const projectResult = await client.query(
+        'SELECT name, address, bid_due_date FROM projects WHERE id = $1',
+        [project_id]
+      );
+
+      if (projectResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const project = projectResult.rows[0];
       const createdITBs = [];
+      const emailResults = [];
 
       for (const subcontractor_id of subcontractor_ids) {
+        // Get subcontractor details
+        const subResult = await client.query(
+          'SELECT name, email FROM companies WHERE id = $1',
+          [subcontractor_id]
+        );
+
+        if (subResult.rows.length === 0) {
+          console.warn(`⚠️  Subcontractor ${subcontractor_id} not found, skipping...`);
+          continue;
+        }
+
+        const subcontractor = subResult.rows[0];
+
+        // Create ITB record
         const result = await client.query(
           `INSERT INTO itbs (project_id, subcontractor_id, status, sent_date, email_subject, email_body)
            VALUES ($1, $2, 'pending', NOW(), $3, $4)
@@ -339,15 +367,41 @@ app.post('/api/itbs', authenticateToken, requireRole(['senior_estimator', 'admin
           [project_id, subcontractor_id, email_subject, email_body]
         );
         
-        createdITBs.push(result.rows[0]);
+        const itb = result.rows[0];
+        createdITBs.push(itb);
+
+        // Send email
+        const emailResult = await sendITB({
+          to: subcontractor.email,
+          subcontractorName: subcontractor.name,
+          projectName: project.name,
+          projectAddress: project.address || 'Address TBD',
+          bidDueDate: project.bid_due_date,
+          itbId: itb.id
+        });
+
+        emailResults.push({
+          subcontractor: subcontractor.name,
+          email: subcontractor.email,
+          ...emailResult
+        });
       }
 
       await client.query('COMMIT');
 
-      // TODO: Send actual emails via SendGrid here
-      console.log(`📧 Would send ${createdITBs.length} ITB emails`);
+      console.log(`📧 Sent ${createdITBs.length} ITB emails`);
+      emailResults.forEach(result => {
+        if (result.success) {
+          console.log(`  ✅ ${result.subcontractor} (${result.email})`);
+        } else {
+          console.log(`  ⚠️  ${result.subcontractor} (${result.email}) - ${result.message || result.error}`);
+        }
+      });
 
-      res.status(201).json(createdITBs);
+      res.status(201).json({
+        itbs: createdITBs,
+        emailResults: emailResults
+      });
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
