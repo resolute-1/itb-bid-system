@@ -200,19 +200,59 @@
             const [bids, setBids] = useState([]);
             const [loading, setLoading] = useState(true);
 
+            // Check for existing token on mount
+            useEffect(() => {
+                const checkAuth = async () => {
+                    const token = api.getToken();
+                    if (token) {
+                        console.log('Found existing token, verifying...');
+                        try {
+                            // Verify token by fetching user data
+                            const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+                                headers: api.headers()
+                            });
+                            if (res.ok) {
+                                const userData = await res.json();
+                                console.log('Token valid, auto-login successful');
+                                setCurrentUser(userData);
+                            } else {
+                                console.log('Token invalid, clearing');
+                                api.clearToken();
+                                setLoading(false);
+                            }
+                        } catch (err) {
+                            console.error('Token verification failed:', err);
+                            api.clearToken();
+                            setLoading(false);
+                        }
+                    } else {
+                        console.log('No existing token found');
+                        setLoading(false);
+                    }
+                };
+                checkAuth();
+            }, []);
+
             // Load data from API on mount
             useEffect(() => {
                 const loadData = async () => {
+                    console.log('Loading data... Token exists:', !!api.getToken());
+                    
                     if (!api.getToken()) {
+                        console.log('No token found, user needs to login');
                         setLoading(false);
                         return;
                     }
                     
                     try {
+                        console.log('Fetching projects and subcontractors from API...');
                         const [projectsData, subsData] = await Promise.all([
                             api.getProjects(),
                             api.getSubcontractors()
                         ]);
+                        
+                        console.log('Loaded projects:', projectsData.length);
+                        console.log('Loaded subcontractors:', subsData.length);
                         
                         setProjects(projectsData.map(p => ({
                             ...p,
@@ -226,8 +266,11 @@
                             csiCode: s.csi_code,
                             contactPerson: s.contact_person
                         })));
+                        
+                        console.log('✅ Data loaded successfully');
                     } catch (err) {
-                        console.error('Failed to load data:', err);
+                        console.error('❌ Failed to load data:', err);
+                        alert('Failed to load data from server. Please try logging out and back in.');
                     } finally {
                         setLoading(false);
                     }
@@ -267,7 +310,10 @@
                             <div className="flex justify-between items-center">
                                 <div>
                                     <h1 className="text-2xl font-bold text-gray-900">ITB/Bid Management System</h1>
-                                    <p className="text-sm text-gray-600 mt-1">{currentUser.name} - {currentUser.role}</p>
+                                    <p className="text-sm text-gray-600 mt-1">
+                                        {currentUser.name} - {currentUser.role}
+                                        {api.getToken() ? ' 🟢 Connected' : ' 🔴 Not Authenticated'}
+                                    </p>
                                 </div>
                                 <div className="flex gap-3">
                                     <button
