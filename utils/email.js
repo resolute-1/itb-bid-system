@@ -10,15 +10,37 @@ const createTransporter = () => {
     return null;
   }
 
-  return nodemailer.createTransport({
+  const config = {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for 587
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
-    }
+    },
+    // Add timeouts and TLS settings for better reliability
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 5000,
+    socketTimeout: 15000,
+    // TLS settings for Gmail
+    tls: {
+      rejectUnauthorized: true,
+      minVersion: 'TLSv1.2'
+    },
+    // Enable debug output
+    debug: process.env.NODE_ENV !== 'production',
+    logger: process.env.NODE_ENV !== 'production'
+  };
+
+  console.log('📧 SMTP Config:', {
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    user: config.auth.user,
+    passLength: config.auth.pass?.length || 0
   });
+
+  return nodemailer.createTransport(config);
 };
 
 // Email template for ITB invitation
@@ -337,12 +359,27 @@ async function sendITB({ to, subcontractorName, projectName, projectAddress, bid
   };
 
   try {
+    // Verify transporter connection before sending
+    await transporter.verify();
+    console.log(`✅ SMTP connection verified`);
+    
     const info = await transporter.sendMail(mailOptions);
     console.log(`✅ ITB email sent to ${to}: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error(`❌ Failed to send ITB email to ${to}:`, error.message);
-    return { success: false, error: error.message };
+    console.error(`❌ Failed to send ITB email to ${to}:`, error);
+    
+    // Provide more specific error messages
+    let errorMessage = error.message;
+    if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
+      errorMessage = 'Connection timeout - check SMTP settings and network';
+    } else if (error.code === 'EAUTH') {
+      errorMessage = 'Authentication failed - check SMTP username/password';
+    } else if (error.responseCode === 535) {
+      errorMessage = 'Invalid credentials - check App Password';
+    }
+    
+    return { success: false, error: errorMessage, details: error.code };
   }
 }
 
