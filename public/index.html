@@ -572,6 +572,7 @@
             const [filterCSI, setFilterCSI] = useState("");
             const [saving, setSaving] = useState(false);
             const [error, setError] = useState('');
+            const [selectedSub, setSelectedSub] = useState(null);
 
             const handleAddSub = async () => {
                 setSaving(true);
@@ -741,7 +742,10 @@
                                                         <p className="font-semibold text-gray-900">{sub.name}</p>
                                                         <p className="text-sm text-gray-600">{sub.email} • {sub.phone}</p>
                                                     </div>
-                                                    <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                                                    <button 
+                                                        onClick={() => setSelectedSub(sub)}
+                                                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                                                    >
                                                         View Details
                                                     </button>
                                                 </div>
@@ -752,6 +756,70 @@
                             );
                         })}
                     </div>
+
+                    {/* Subcontractor Details Modal */}
+                    {selectedSub && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedSub(null)}>
+                            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-between items-start mb-4">
+                                    <h3 className="text-2xl font-bold text-gray-900">{selectedSub.name}</h3>
+                                    <button 
+                                        onClick={() => setSelectedSub(null)}
+                                        className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">CSI Division</label>
+                                            <p className="text-gray-900">
+                                                {selectedSub.csiCode} - {CSI_DIVISIONS.find(d => d.code === selectedSub.csiCode)?.name}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">Contact Person</label>
+                                            <p className="text-gray-900">{selectedSub.contactPerson || 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">Email</label>
+                                            <p className="text-gray-900">{selectedSub.email}</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">Phone</label>
+                                            <p className="text-gray-900">{selectedSub.phone}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-500 mb-1">Address</label>
+                                        <p className="text-gray-900">{selectedSub.address || 'N/A'}</p>
+                                    </div>
+                                    
+                                    {selectedSub.notes && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">Notes</label>
+                                            <p className="text-gray-900 whitespace-pre-wrap">{selectedSub.notes}</p>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="pt-4 border-t border-gray-200">
+                                        <button
+                                            onClick={() => setSelectedSub(null)}
+                                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
