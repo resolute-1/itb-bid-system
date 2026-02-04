@@ -83,6 +83,25 @@
                 }
                 
                 const result = await res.json();
+                console.log('Created subcontractor:', result);
+                return result;
+            },
+            async updateSubcontractor(id, data) {
+                console.log('Sending PUT to /api/subcontractors/' + id, data);
+                const res = await fetch(`${API_BASE_URL}/api/subcontractors/${id}`, {
+                    method: 'PUT',
+                    headers: api.headers(),
+                    body: JSON.stringify(data)
+                });
+                console.log('Response status:', res.status);
+                
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error('API Error:', res.status, errorText);
+                    throw new Error(`Server error: ${res.status} - ${errorText}`);
+                }
+                
+                const result = await res.json();
                 console.log('API response:', result);
                 return result;
             },
@@ -573,6 +592,8 @@
             const [saving, setSaving] = useState(false);
             const [error, setError] = useState('');
             const [selectedSub, setSelectedSub] = useState(null);
+            const [isEditing, setIsEditing] = useState(false);
+            const [editedSub, setEditedSub] = useState(null);
 
             const handleAddSub = async () => {
                 setSaving(true);
@@ -614,6 +635,67 @@
                 } finally {
                     setSaving(false);
                 }
+            };
+
+            const handleEditClick = () => {
+                setEditedSub({
+                    name: selectedSub.name,
+                    email: selectedSub.email,
+                    phone: selectedSub.phone,
+                    csiCode: selectedSub.csiCode,
+                    address: selectedSub.address || '',
+                    contactPerson: selectedSub.contactPerson || '',
+                    notes: selectedSub.notes || ''
+                });
+                setIsEditing(true);
+            };
+
+            const handleSaveEdit = async () => {
+                setSaving(true);
+                setError('');
+                
+                try {
+                    console.log('Updating subcontractor:', editedSub);
+                    const data = await api.updateSubcontractor(selectedSub.id, {
+                        name: editedSub.name,
+                        email: editedSub.email,
+                        phone: editedSub.phone,
+                        csi_code: editedSub.csiCode,
+                        address: editedSub.address,
+                        contact_person: editedSub.contactPerson,
+                        notes: editedSub.notes
+                    });
+                    
+                    console.log('Subcontractor updated:', data);
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    // Update local state
+                    setSubcontractors(subcontractors.map(sub => 
+                        sub.id === selectedSub.id 
+                            ? { ...data, csiCode: data.csi_code, contactPerson: data.contact_person }
+                            : sub
+                    ));
+                    
+                    setSelectedSub({ ...data, csiCode: data.csi_code, contactPerson: data.contact_person });
+                    setIsEditing(false);
+                    alert('✅ Subcontractor updated successfully!');
+                } catch (err) {
+                    const errorMsg = err.message || 'Failed to update subcontractor. Please try again.';
+                    setError(errorMsg);
+                    alert('❌ Error: ' + errorMsg);
+                    console.error('Update subcontractor error:', err);
+                } finally {
+                    setSaving(false);
+                }
+            };
+
+            const handleCancelEdit = () => {
+                setIsEditing(false);
+                setEditedSub(null);
+                setError('');
             };
 
             const filteredSubs = filterCSI 
@@ -759,64 +841,185 @@
 
                     {/* Subcontractor Details Modal */}
                     {selectedSub && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedSub(null)}>
-                            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => { setSelectedSub(null); setIsEditing(false); }}>
+                            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-between items-start mb-4">
-                                    <h3 className="text-2xl font-bold text-gray-900">{selectedSub.name}</h3>
+                                    <h3 className="text-2xl font-bold text-gray-900">{isEditing ? 'Edit Subcontractor' : selectedSub.name}</h3>
                                     <button 
-                                        onClick={() => setSelectedSub(null)}
+                                        onClick={() => { setSelectedSub(null); setIsEditing(false); }}
                                         className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
                                     >
                                         ×
                                     </button>
                                 </div>
                                 
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">CSI Division</label>
-                                            <p className="text-gray-900">
-                                                {selectedSub.csiCode} - {CSI_DIVISIONS.find(d => d.code === selectedSub.csiCode)?.name}
-                                            </p>
+                                {error && (
+                                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+                                        {error}
+                                    </div>
+                                )}
+                                
+                                {!isEditing ? (
+                                    /* VIEW MODE */
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-500 mb-1">Company Name</label>
+                                                <p className="text-gray-900">{selectedSub.name}</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-500 mb-1">CSI Division</label>
+                                                <p className="text-gray-900">
+                                                    {selectedSub.csiCode} - {CSI_DIVISIONS.find(d => d.code === selectedSub.csiCode)?.name}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">Contact Person</label>
-                                            <p className="text-gray-900">{selectedSub.contactPerson || 'N/A'}</p>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-500 mb-1">Email</label>
+                                                <p className="text-gray-900">{selectedSub.email}</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-500 mb-1">Phone</label>
+                                                <p className="text-gray-900">{selectedSub.phone}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-500 mb-1">Contact Person</label>
+                                                <p className="text-gray-900">{selectedSub.contactPerson || 'N/A'}</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-500 mb-1">Address</label>
+                                                <p className="text-gray-900">{selectedSub.address || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {selectedSub.notes && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-500 mb-1">Notes</label>
+                                                <p className="text-gray-900 whitespace-pre-wrap">{selectedSub.notes}</p>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="pt-4 border-t border-gray-200 flex gap-3">
+                                            <button
+                                                onClick={handleEditClick}
+                                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedSub(null)}
+                                                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                                            >
+                                                Close
+                                            </button>
                                         </div>
                                     </div>
-                                    
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">Email</label>
-                                            <p className="text-gray-900">{selectedSub.email}</p>
+                                ) : (
+                                    /* EDIT MODE */
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                                                <input
+                                                    type="text"
+                                                    value={editedSub.name}
+                                                    onChange={(e) => setEditedSub({...editedSub, name: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">CSI Code *</label>
+                                                <select
+                                                    value={editedSub.csiCode}
+                                                    onChange={(e) => setEditedSub({...editedSub, csiCode: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                    required
+                                                >
+                                                    <option value="">Select CSI Code</option>
+                                                    {CSI_DIVISIONS.map(div => (
+                                                        <option key={div.code} value={div.code}>{div.code} - {div.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                                                <input
+                                                    type="email"
+                                                    value={editedSub.email}
+                                                    onChange={(e) => setEditedSub({...editedSub, email: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                                <input
+                                                    type="tel"
+                                                    value={editedSub.phone}
+                                                    onChange={(e) => setEditedSub({...editedSub, phone: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                                                <input
+                                                    type="text"
+                                                    value={editedSub.contactPerson}
+                                                    onChange={(e) => setEditedSub({...editedSub, contactPerson: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                                                <input
+                                                    type="text"
+                                                    value={editedSub.address}
+                                                    onChange={(e) => setEditedSub({...editedSub, address: e.target.value})}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                        
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">Phone</label>
-                                            <p className="text-gray-900">{selectedSub.phone}</p>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                                            <textarea
+                                                value={editedSub.notes}
+                                                onChange={(e) => setEditedSub({...editedSub, notes: e.target.value})}
+                                                rows="3"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        
+                                        <div className="pt-4 border-t border-gray-200 flex gap-3">
+                                            <button
+                                                onClick={handleSaveEdit}
+                                                disabled={saving || !editedSub.name || !editedSub.email || !editedSub.csiCode}
+                                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {saving ? 'Saving...' : 'Save Changes'}
+                                            </button>
+                                            <button
+                                                onClick={handleCancelEdit}
+                                                disabled={saving}
+                                                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
+                                            >
+                                                Cancel
+                                            </button>
                                         </div>
                                     </div>
-                                    
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-500 mb-1">Address</label>
-                                        <p className="text-gray-900">{selectedSub.address || 'N/A'}</p>
-                                    </div>
-                                    
-                                    {selectedSub.notes && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-500 mb-1">Notes</label>
-                                            <p className="text-gray-900 whitespace-pre-wrap">{selectedSub.notes}</p>
-                                        </div>
-                                    )}
-                                    
-                                    <div className="pt-4 border-t border-gray-200">
-                                        <button
-                                            onClick={() => setSelectedSub(null)}
-                                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                                        >
-                                            Close
-                                        </button>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     )}
