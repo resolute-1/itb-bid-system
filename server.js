@@ -645,11 +645,75 @@ app.get('/setup', async (req, res) => {
 });
 
 // ==========================================
+// PUBLIC ITB ENDPOINT (No Authentication Required)
+// ==========================================
+
+// Get ITB details by ID for subcontractor bid portal
+app.get('/api/itbs/public/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get ITB with project and subcontractor details
+    const result = await pool.query(
+      `SELECT 
+        itbs.id as itb_id,
+        itbs.status as itb_status,
+        itbs.sent_date,
+        itbs.email_subject,
+        itbs.email_body,
+        projects.id as project_id,
+        projects.name as project_name,
+        projects.project_number,
+        projects.address as project_address,
+        projects.bid_due_date,
+        companies.id as subcontractor_id,
+        companies.name as subcontractor_name,
+        companies.email as subcontractor_email
+      FROM itbs
+      JOIN projects ON itbs.project_id = projects.id
+      JOIN companies ON itbs.subcontractor_id = companies.id
+      WHERE itbs.id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'ITB not found' });
+    }
+
+    const itb = result.rows[0];
+    
+    // Check if ITB is still valid for bidding
+    const bidDueDate = new Date(itb.bid_due_date);
+    const now = new Date();
+    const isPastDue = bidDueDate < now;
+
+    res.json({
+      ...itb,
+      is_past_due: isPastDue
+    });
+  } catch (error) {
+    console.error('Get public ITB error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==========================================
 // HEALTH CHECK
 // ==========================================
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// ==========================================
+// CATCH-ALL ROUTE FOR SPA CLIENT-SIDE ROUTING
+// ==========================================
+
+// This MUST be the last route - serves index.html for all non-API routes
+// Enables client-side routing for /bid-portal, etc.
+const path = require('path');
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ==========================================
