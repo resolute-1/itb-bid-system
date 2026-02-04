@@ -200,6 +200,48 @@
             const [bids, setBids] = useState([]);
             const [loading, setLoading] = useState(true);
 
+            // Function to load/reload data from API
+            const loadData = async () => {
+                console.log('Loading data... Token exists:', !!api.getToken());
+                
+                if (!api.getToken()) {
+                    console.log('No token found, user needs to login');
+                    setLoading(false);
+                    return;
+                }
+                
+                try {
+                    console.log('Fetching projects and subcontractors from API...');
+                    const [projectsData, subsData] = await Promise.all([
+                        api.getProjects(),
+                        api.getSubcontractors()
+                    ]);
+                    
+                    console.log('Loaded projects:', projectsData.length);
+                    console.log('Loaded subcontractors:', subsData.length);
+                    
+                    setProjects(projectsData.map(p => ({
+                        ...p,
+                        projectNumber: p.project_number,
+                        bidDueDate: p.bid_due_date,
+                        createdBy: p.created_by_name
+                    })));
+                    
+                    setSubcontractors(subsData.map(s => ({
+                        ...s,
+                        csiCode: s.csi_code,
+                        contactPerson: s.contact_person
+                    })));
+                    
+                    console.log('✅ Data loaded successfully');
+                } catch (err) {
+                    console.error('❌ Failed to load data:', err);
+                    alert('Failed to load data from server. Please try logging out and back in.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
             // Check for existing token on mount
             useEffect(() => {
                 const checkAuth = async () => {
@@ -233,50 +275,11 @@
                 checkAuth();
             }, []);
 
-            // Load data from API on mount
+            // Load data from API when user logs in
             useEffect(() => {
-                const loadData = async () => {
-                    console.log('Loading data... Token exists:', !!api.getToken());
-                    
-                    if (!api.getToken()) {
-                        console.log('No token found, user needs to login');
-                        setLoading(false);
-                        return;
-                    }
-                    
-                    try {
-                        console.log('Fetching projects and subcontractors from API...');
-                        const [projectsData, subsData] = await Promise.all([
-                            api.getProjects(),
-                            api.getSubcontractors()
-                        ]);
-                        
-                        console.log('Loaded projects:', projectsData.length);
-                        console.log('Loaded subcontractors:', subsData.length);
-                        
-                        setProjects(projectsData.map(p => ({
-                            ...p,
-                            projectNumber: p.project_number,
-                            bidDueDate: p.bid_due_date,
-                            createdBy: p.created_by_name
-                        })));
-                        
-                        setSubcontractors(subsData.map(s => ({
-                            ...s,
-                            csiCode: s.csi_code,
-                            contactPerson: s.contact_person
-                        })));
-                        
-                        console.log('✅ Data loaded successfully');
-                    } catch (err) {
-                        console.error('❌ Failed to load data:', err);
-                        alert('Failed to load data from server. Please try logging out and back in.');
-                    } finally {
-                        setLoading(false);
-                    }
-                };
-
-                loadData();
+                if (currentUser) {
+                    loadData();
+                }
             }, [currentUser]);
 
             const handleLogin = (user) => {
@@ -377,6 +380,7 @@
                                 project={selectedProject}
                                 subcontractors={subcontractors}
                                 setCurrentView={setCurrentView}
+                                loadData={loadData}
                                 bids={bids}
                                 setBids={setBids}
                             />
@@ -753,7 +757,7 @@
         }
 
         // Create ITB Component
-        function CreateITB({ project, subcontractors, setCurrentView, bids, setBids }) {
+        function CreateITB({ project, subcontractors, setCurrentView, bids, setBids, loadData }) {
             const [selectedSubs, setSelectedSubs] = useState([]);
             const [emailSubject, setEmailSubject] = useState(`Invitation to Bid - ${project.name}`);
             const [emailBody, setEmailBody] = useState(`Dear Subcontractor,\n\nYou are invited to bid on the following project:\n\nProject: ${project.name}\nProject Number: ${project.projectNumber}\nLocation: ${project.address}\nBid Due Date: ${new Date(project.bidDueDate).toLocaleDateString()}\n\nPlease submit your bid through our online portal.\n\nBest regards,\nEstimating Department`);
@@ -810,6 +814,11 @@
                         
                         alert(message);
                         setSelectedSubs([]);
+                        
+                        // Reload data to update ITB counts
+                        console.log('🔄 Reloading project data...');
+                        await loadData();
+                        
                         setCurrentView('dashboard');
                     } else {
                         throw new Error(result.error || 'Failed to send ITBs');
