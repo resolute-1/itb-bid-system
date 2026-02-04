@@ -1,8 +1,15 @@
-// utils/email.js - Email sending functionality using Nodemailer
+// utils/email.js - Email sending functionality using Nodemailer or SendGrid API
 
 const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-// Create reusable transporter
+// Initialize SendGrid if API key is available
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('✅ SendGrid HTTP API initialized (bypasses SMTP blocking)');
+}
+
+// Create reusable transporter (for SMTP, kept as backup)
 const createTransporter = () => {
   // Check if SMTP settings are configured
   if (!process.env.SMTP_HOST) {
@@ -341,38 +348,67 @@ const getBidReminderTemplate = (projectName, bidDueDate, daysRemaining, bidPorta
  * @returns {Promise<Object>} - Result of email send
  */
 async function sendITB({ to, subcontractorName, projectName, projectAddress, bidDueDate, itbId }) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const bidPortalLink = `${frontendUrl}/bid-portal?itb_id=${itbId}`;
+  const htmlContent = getITBEmailTemplate(projectName, projectAddress, bidDueDate, bidPortalLink);
+
+  // Try SendGrid HTTP API first (recommended for Railway/cloud platforms)
+  if (process.env.SENDGRID_API_KEY) {
+    console.log(`📧 Using SendGrid HTTP API to send to ${to}`);
+    
+    const msg = {
+      to: to,
+      from: {
+        name: process.env.SMTP_FROM_NAME || 'ITB Bid System',
+        email: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER
+      },
+      subject: `Invitation to Bid - ${projectName}`,
+      html: htmlContent
+    };
+
+    try {
+      const response = await sgMail.send(msg);
+      console.log(`✅ ITB email sent via SendGrid to ${to}`);
+      return { success: true, messageId: response[0].headers['x-message-id'] };
+    } catch (error) {
+      console.error(`❌ SendGrid API error:`, error.response?.body || error.message);
+      return { 
+        success: false, 
+        error: error.response?.body?.errors?.[0]?.message || error.message 
+      };
+    }
+  }
+
+  // Fall back to SMTP (for local development or alternative SMTP providers)
   const transporter = createTransporter();
   
   if (!transporter) {
     console.log(`📧 [DEV MODE] Would send ITB email to ${to} for project: ${projectName}`);
-    return { success: false, message: 'SMTP not configured - running in dev mode' };
+    return { success: false, message: 'No email service configured - running in dev mode' };
   }
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const bidPortalLink = `${frontendUrl}/bid-portal?itb_id=${itbId}`;
+  console.log(`📧 Using SMTP to send to ${to}`);
 
   const mailOptions = {
     from: `"${process.env.SMTP_FROM_NAME || 'ITB Bid System'}" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER}>`,
     to: to,
     subject: `Invitation to Bid - ${projectName}`,
-    html: getITBEmailTemplate(projectName, projectAddress, bidDueDate, bidPortalLink)
+    html: htmlContent
   };
 
   try {
-    // Verify transporter connection before sending
     await transporter.verify();
     console.log(`✅ SMTP connection verified`);
     
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ ITB email sent to ${to}: ${info.messageId}`);
+    console.log(`✅ ITB email sent via SMTP to ${to}: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error(`❌ Failed to send ITB email to ${to}:`, error);
     
-    // Provide more specific error messages
     let errorMessage = error.message;
     if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
-      errorMessage = 'Connection timeout - check SMTP settings and network';
+      errorMessage = 'Connection timeout - SMTP blocked by hosting provider. Use SENDGRID_API_KEY instead.';
     } else if (error.code === 'EAUTH') {
       errorMessage = 'Authentication failed - check SMTP username/password';
     } else if (error.responseCode === 535) {
